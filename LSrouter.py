@@ -7,6 +7,7 @@
 from router import Router
 from packet import Packet
 import json
+import heapq
 
 
 class LSrouter(Router):
@@ -42,6 +43,58 @@ class LSrouter(Router):
             if port != exclude_port:
                 self.send(port, packet) #gửi packet tới tất cả các neighbors nếu có cổng khác exclude_port
     
+    def run_dijkstra(self):
+        graph = {}
+        for origin, data in self.ls_db.items():
+            if origin not in graph:
+                graph[origin] = {}
+            for neighbor, cost in data["neighbors"].items():
+                graph[origin][neighbor] = cost
+                if neighbor not in graph:
+                    graph[neighbor] = {}
+                graph[neighbor][origin] = cost
+
+        #Thuật toán dijkstra tính đường đi ngắn nhất từ router này đến tất cả các router dựa trên graph được xây dựng từ ls_db
+        dist = {self.addr: 0} #
+        prev = {self.addr: None}  # router trước đó trên đường đi ngắn nhất từ self tởi router đích, dùng xây dựng forwarding table
+        # first_hop_port lưu cổng đầu tiên trên đường đi từ self đến router đích
+        first_hop_port = {self.addr: None}
+
+        heap = [(0, self.addr)]
+        visited = set()
+
+        while heap:
+            cost, u = heapq.heappop(heap)
+            if u in visited:
+                continue
+            visited.add(u)
+
+            for v, w in graph.get(u, {}).items():
+                new_cost = cost + w
+                if v not in dist or new_cost < dist[v]:
+                    dist[v] = new_cost
+                    prev[v] = u
+                    # nếu u là router hiện tại, cổng đầu tiên để đến v là cổng trực tiếp kết nối đến neighbor v. Nếu u không phải là router hiện tại, cổng đầu tiên để đến v là cổng đầu tiên để đến u.
+                    if u == self.addr:
+                        # tìm cổng kết nối trực tiếp đến neighbor v bằng cách duyệt neighbors của router hiện tại
+                        port = self.port_to_neighbor(v)
+                        first_hop_port[v] = port
+                    else:
+                        first_hop_port[v] = first_hop_port[u]
+                    heapq.heappush(heap, (new_cost, v))
+
+        self.forwarding_table = {}
+        for dst, port in first_hop_port.items():
+            if dst != self.addr and port is not None:
+                self.forwarding_table[dst] = port
+
+    def port_to_neighbor(self, neighbor_addr):
+        """Helper function to find the port that connects to a given neighbor."""
+        for port, (addr, cost) in self.neighbors.items():
+            if addr == neighbor_addr:
+                return port
+        return None
+
 
     def handle_packet(self, port, packet):
         """Process incoming packet."""

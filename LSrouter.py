@@ -5,6 +5,8 @@
 #####################################################
 
 from router import Router
+from packet import Packet
+import json
 
 
 class LSrouter(Router):
@@ -24,6 +26,21 @@ class LSrouter(Router):
         self.neighbors = {} # port -> (neighbor_addr, cost)
         self.ls_db = {self.addr: {"neighbors": {}, "seq": 0}} # origin_addr -> {"neighbors": {addr: cost}, "seq": int}
         self.forwarding_table = {} # dst_addr -> port
+
+    def broadcast_lsa(self, exclude_port=None):
+        """Broadcast this router's link-state advertisement to all neighbors."""
+        # TODO
+        #   tạo LS advertisement chứa thông tin về địa chỉ nguồn, sequence number, neighbors của router
+        #   gửi tới tất cả các neighbors trong ls_db ngoại trừ exlude_port nếu có (flooding)
+        lsa = {
+            "origin": self.addr,
+            "seq": self.ls_db[self.addr]["seq"],
+            "neighbors": dict(self.ls_db[self.addr]["neighbors"]),}
+        content = json.dumps(lsa) # chuyển lsa sang một chuỗi json để gửi đi qua mạng
+        packet = Packet(Packet.ROUTING, self.addr, self.addr, content)
+        for port in self.links: 
+            if port != exclude_port:
+                self.send(port, packet) #gửi packet tới tất cả các neighbors nếu có cổng khác exclude_port
     
 
     def handle_packet(self, port, packet):

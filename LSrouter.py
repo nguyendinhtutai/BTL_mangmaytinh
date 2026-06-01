@@ -115,7 +115,7 @@ class LSrouter(Router):
             lsa = json.loads(packet.content)
             origin = lsa["origin"]
             seq = lsa["seq"]
-            neighbors = lsa[neighbors]
+            neighbors = lsa["neighbors"]
 
             if origin not in self.ls_db or seq > self.ls_db[origin]["seq"]: #nếu nhận được LSA mới hơn hoặc từ router chưa biết đến trước đó
                 self.ls_db[origin] = {"neighbors": neighbors, "seq": seq} #update ls_db

@@ -141,7 +141,13 @@ class LSrouter(Router):
         # TODO
         #   update local data structures and forwarding table
         #   broadcast the new link state of this router to all neighbors
-        pass
+        if port in self.neighbors:
+            endpoint, cost = self.neighbors.pop(port) #xóa neighbor khỏi neighbors
+            if endpoint in self.ls_db[self.addr]["neighbors"]:
+                del self.ls_db[self.addr]["neighbors"][endpoint] #xóa neighbor khỏi ls_db
+                self.ls_db[self.addr]["seq"] += 1 #tăng phiên bản của router trong ls_db
+                self.run_dijkstra() #cập nhật forwarding table sau khi có sự thay đổi về liên kết
+                self.broadcast_lsa() #broadcast LSA mới sau khi có sự thay đổi về liên kết
 
     def handle_time(self, time_ms):
         """Handle current time."""
@@ -149,7 +155,9 @@ class LSrouter(Router):
             self.last_time = time_ms
             # TODO
             #   broadcast the link state of this router to all neighbors
-            pass
+            self.ls_db[self.addr]["seq"] += 1 #tăng phiên bản của router trong ls_db
+            self.broadcast_lsa() #broadcast LSA mới sau khi có sự thay đổi về liên
+            
 
     def __repr__(self):
         """Representation for debugging in the network visualizer."""

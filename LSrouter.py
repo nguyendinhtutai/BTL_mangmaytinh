@@ -50,13 +50,10 @@ class LSrouter(Router):
                 graph[origin] = {}
             for neighbor, cost in data["neighbors"].items():
                 graph[origin][neighbor] = cost
-                if neighbor not in graph:
-                    graph[neighbor] = {}
-                graph[neighbor][origin] = cost
+                
 
         #Thuật toán dijkstra tính đường đi ngắn nhất từ router này đến tất cả các router dựa trên graph được xây dựng từ ls_db
         dist = {self.addr: 0} #
-        prev = {self.addr: None}  # router trước đó trên đường đi ngắn nhất từ self tởi router đích, dùng xây dựng forwarding table
         # first_hop_port lưu cổng đầu tiên trên đường đi từ self đến router đích
         first_hop_port = {self.addr: None}
 
@@ -73,14 +70,13 @@ class LSrouter(Router):
                 new_cost = cost + w
                 if v not in dist or new_cost < dist[v]:
                     dist[v] = new_cost
-                    prev[v] = u
                     # nếu u là router hiện tại, cổng đầu tiên để đến v là cổng trực tiếp kết nối đến neighbor v. Nếu u không phải là router hiện tại, cổng đầu tiên để đến v là cổng đầu tiên để đến u.
                     if u == self.addr:
                         # tìm cổng kết nối trực tiếp đến neighbor v bằng cách duyệt neighbors của router hiện tại
                         port = self.port_to_neighbor(v)
                         first_hop_port[v] = port
                     else:
-                        first_hop_port[v] = first_hop_port[u]
+                        first_hop_port[v] = first_hop_port.get(u)
                     heapq.heappush(heap, (new_cost, v))
 
         self.forwarding_table = {}
@@ -117,11 +113,14 @@ class LSrouter(Router):
             seq = lsa["seq"]
             neighbors = lsa["neighbors"]
 
-            if origin not in self.ls_db or seq > self.ls_db[origin]["seq"]: #nếu nhận được LSA mới hơn hoặc từ router chưa biết đến trước đó
-                self.ls_db[origin] = {"neighbors": neighbors, "seq": seq} #update ls_db
-                self.run_dijkstra() #update forwadrding table 
-                self.broadcast_lsa(exclude_port=port) # flood tới tất cả neighbors trừ port nhận được packet này
-            else: return
+            if origin not in self.ls_db or self.ls_db[origin]["seq"] < seq:
+                # Update LS database
+                self.ls_db[origin] = {"neighbors": neighbors, "seq": seq}
+                self.run_dijkstra() #cập nhật forwarding table sau khi có sự thay đổi về link state
+                for p in self.links:
+                    if p != port:
+                        self.send(p, packet) #flooding packet tới tất cả các neighbors nếu có cổng khác exclude_port
+            else: return            
 
 
     def handle_new_link(self, port, endpoint, cost):

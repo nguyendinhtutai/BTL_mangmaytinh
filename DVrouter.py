@@ -16,13 +16,13 @@ class DVrouter(Router):
     INFINITY = 16
 
     def __init__(self, addr, heartbeat_time):
-        Router.__init__(self, addr)
+        Router.__init__(self, addr) 
 
         self.heartbeat_time = heartbeat_time
         self.last_time = 0
 
         # port -> (neighbor_addr, cost)
-        self.taitai = {}
+        self.arrLink = {}
 
         # destination -> cost
         self.distance_vector = {self.addr: 0}
@@ -40,7 +40,7 @@ class DVrouter(Router):
             "vector": self.distance_vector
         })
 
-        for port in self.taitai:
+        for port in self.arrLink:
             pkt = Packet(
                 kind=Packet.ROUTING,
                 src_addr=self.addr,
@@ -55,13 +55,13 @@ class DVrouter(Router):
         new_ft = {}
 
         # Direct neighbors
-        for port, (neighbor, cost) in self.taitai.items():
+        for port, (neighbor, cost) in self.arrLink.items():
             if cost < new_dv.get(neighbor, self.INFINITY):
                 new_dv[neighbor] = cost
                 new_ft[neighbor] = port
 
         # Routes learned from neighbors
-        for port, (neighbor, link_cost) in self.taitai.items():
+        for port, (neighbor, link_cost) in self.arrLink.items():
             neighbor_vector = self.neighbor_vectors.get(neighbor, {})
 
             for dest, neighbor_cost in neighbor_vector.items():
@@ -122,7 +122,7 @@ class DVrouter(Router):
     def handle_new_link(self, port, endpoint, cost):
         """Handle new link."""
 
-        self.taitai[port] = (endpoint, cost)
+        self.arrLink[port] = (endpoint, cost)
 
         # Direct route to neighbor
         self.distance_vector[endpoint] = cost
@@ -136,12 +136,12 @@ class DVrouter(Router):
     def handle_remove_link(self, port):
         """Handle removed link."""
 
-        if port not in self.taitai:
+        if port not in self.arrLink:
             return
 
-        endpoint, _ = self.taitai[port]
+        endpoint, _ = self.arrLink[port]
 
-        del self.taitai[port]
+        del self.arrLink[port]
 
         if endpoint in self.neighbor_vectors:
             del self.neighbor_vectors[endpoint]
